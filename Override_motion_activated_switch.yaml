@@ -1,0 +1,71 @@
+blueprint:
+  name: Motion-Activated Switch Control with Override
+  description: >
+    Turn a switch on when motion is detected. Turn it off after the sensor
+    stays 'off' for a given delay, unless `override_switch` is on, in
+    which case, keep the switch on.
+
+  domain: automation
+
+  input:
+    motion_sensor:
+      name: Motion Sensor
+      description: The motion sensor or group to monitor.
+      selector:
+        entity:
+          domain: binary_sensor
+          device_class: motion
+
+    target_switch:
+      name: Target Switch
+      description: The switch to control.
+      selector:
+        entity:
+          domain: switch
+
+    no_motion_wait:
+      name: Delay after no motion
+      description: Time in seconds to wait before turning off the switch.
+      default: 60
+      selector:
+        number:
+          min: 1
+          max: 3600
+          unit_of_measurement: seconds
+          mode: slider
+
+    override_switch:
+      name: Override Switch
+      description: Input Boolean or Switch to keep the lights on.
+      selector:
+        entity: {}
+      default: ''
+
+trigger:
+  - platform: state
+    entity_id: !input motion_sensor
+    to: "on"
+
+action:
+  # Turn switch on immediately when motion is detected
+  - service: switch.turn_on
+    target:
+      entity_id: !input target_switch
+
+  # Wait until the motion sensor is off for the specified time
+  - wait_for_trigger:
+      - platform: state
+        entity_id: !input motion_sensor
+        to: "off"
+        for:
+          seconds: !input no_motion_wait
+
+  # Check if the override is OFF before proceeding
+  - condition: state
+    entity_id: !input override_switch
+    state: "off"
+
+  # If override is off, turn the switch off
+  - service: switch.turn_off
+    target:
+      entity_id: !input target_switch
